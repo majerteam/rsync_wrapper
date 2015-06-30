@@ -158,9 +158,11 @@ def context(section_name='main_backup'):
     dst_dir = config[section_name]['dst_dir']
     logbase = config[section_name]['logbase']
 
-    mailto = config[section_name].get('mailto', None)
+    mailto = config[section_name].get('mailto', '')
     if mailto:
-        if not config.get('mail', None):
+        try:
+            mailcfg = config['mail']
+        except KeyError:
             raise ConfigException(
                 "mailto not null in section {0}, but no section 'mail'".format(
                     section_name
