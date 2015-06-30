@@ -252,11 +252,15 @@ def log2mail(context):
     msg['From'] = context.mail.mailfrom
     msg['To'] = context.mail.mailto
 
+    msg.preamble = 'mail sent by run_backup'
 
-    msg.preamble = '{}\nreturncode of rsync was {}\n'.format(
-        subject,
-        returncode
+    readable = MIMEText(
+        '{}\nreturncode of rsync was {}\n'.format(
+            subject,
+            returncode
+        )
     )
+    msg.attach(readable)
 
     for name, fname in (
             ('stdout.txt', context.log_out_fd.name),
@@ -264,7 +268,8 @@ def log2mail(context):
             ):
         textfile = MIMEText(
             open(fname).read(),
-            'plain'
+            'plain',
+            'utf-8'
         )
         textfile.add_header('Content-Disposition', 'attachment', filename=name)
         msg.attach(textfile)
