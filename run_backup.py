@@ -267,7 +267,7 @@ def log2mail(context):
             ('stderr.txt', context.log_err_fd.name),
             ):
         textfile = MIMEText(
-            open(fname).read(),
+            open(fname, 'rt', encoding='utf-8').read(),
             'plain',
             'utf-8'
         )
