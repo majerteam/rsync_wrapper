@@ -247,7 +247,7 @@ def log2mail(context):
         subject = '[success] {}'.format(taskdesc)
     else:
         subject = '[failed] {}'.format(taskdesc)
-    msg = MIMEMultiPart(
+    msg = MIMEMultipart(
         Subject=subject,
         From=context.mail.mailfrom,
         To=context.mail.mailto,
