@@ -247,11 +247,11 @@ def log2mail(context):
         subject = '[success] {}'.format(taskdesc)
     else:
         subject = '[failed] {}'.format(taskdesc)
-    msg = MIMEMultipart(
-        Subject=subject,
-        From=context.mail.mailfrom,
-        To=context.mail.mailto,
-    )
+    msg = MIMEMultipart()
+    msg['Subject'] = subject,
+    msg['From'] = context.mail.mailfrom,
+    msg['To'] = context.mail.mailto,
+
 
     msg.preamble = '{}\nreturncode of rsync was {}\n'.format(
         subject,
