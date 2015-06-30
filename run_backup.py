@@ -31,7 +31,7 @@ import smtplib
 import subprocess
 import sys
 
-from email.mime.application import MIMEApplication
+from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
@@ -262,13 +262,12 @@ def log2mail(context):
             ('stdout.txt', context.log_out_fd.name),
             ('stderr.txt', context.log_err_fd.name),
             ):
-        textfile = MIMEApplication(
+        textfile = MIMEText(
             open(fname).read(),
-            Content_Disposition='attachment; filename="{}"'.format(name)
+            'plain'
         )
-        msg.attach(
-            textfile
-        )
+        textfile.add_header('Content-Disposition', 'attachment', filename=name)
+        msg.attach(textfile)
 
     session = smtplib.SMTP(context.mail.smtp)
     session.sendmail(
