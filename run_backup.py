@@ -24,12 +24,9 @@ logbase=/place/where/i/log
 
 import collections
 import configparser
-import contextlib
 import datetime
 import logging
 import os
-import shlex
-import shutil
 import subprocess
 import sys
 
@@ -41,8 +38,10 @@ if not StreamHandler:
     StreamHandler = logging.handlers.StreamHandler
 
 
-# holds config
-Context = collections.namedtuple('BackupContext',
+# holds config
+
+Context = collections.namedtuple(
+    'BackupContext',
     (
         'host',
         'src_dir',
@@ -53,6 +52,7 @@ Context = collections.namedtuple('BackupContext',
         'log_ret_fd',
     )
 )
+
 
 def backup(context, logger):
     """
@@ -72,7 +72,7 @@ def backup(context, logger):
         ("stdout", context.log_out_fd.name),
         ("stderr", context.log_err_fd.name),
         ("return code", context.log_ret_fd.name),
-        ):
+            ):
         logger.info("{0} goes to {1}".format(desc, fname))
 
     process = subprocess.Popen(
@@ -123,7 +123,7 @@ def context(section_name='main_backup'):
     config = configparser.ConfigParser()
     config_fname = _config_file()
     config.read(config_fname)
-    if not section_name in config:
+    if section_name not in config:
         raise Exception("Need a '{}' section in {}".format(
             section_name, config_fname
         ))
@@ -138,11 +138,6 @@ def context(section_name='main_backup'):
         for path in (src_dir, dst_dir)
     )
 
-    log_fnames = (
-        os.path.join(logbase, nowdir, fname)
-        for fname in ('rsync_out', 'rsync_err', 'rsync_ret')
-    )
-
     now = datetime.datetime.now()
     nowdir = os.path.join(
         '%i' % now.year,
@@ -150,7 +145,12 @@ def context(section_name='main_backup'):
         '%i' % now.day,
         '%i_%i_%i.%i' % (now.hour, now.minute, now.second, now.microsecond)
     )
+
     os.makedirs(os.path.join(logbase, nowdir))
+    log_fnames = (
+        os.path.join(logbase, nowdir, fname)
+        for fname in ('rsync_out', 'rsync_err', 'rsync_ret')
+    )
     log_fds = (
         open(fname, 'w')
         for fname in log_fnames
@@ -161,7 +161,9 @@ def context(section_name='main_backup'):
         src_dir,
         dst_dir,
         os.path.join(
-            logbase, nowdir, '{}.log'.format(sys.argv[0])
+            logbase, nowdir, '{}.log'.format(
+                os.path.basename(sys.argv[0])
+            )
         )
         ) + tuple(log_fds)
     print(ctx_args)
