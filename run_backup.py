@@ -259,8 +259,8 @@ def log2mail(context):
     )
 
     for name, fname in (
-            'stdout.txt', context.log_out_fd.name,
-            'stderr.txt', context.log_err_fd.name,
+            ('stdout.txt', context.log_out_fd.name),
+            ('stderr.txt', context.log_err_fd.name),
             ):
         textfile = MIMEApplication(
             open(fname).read(),
