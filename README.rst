@@ -45,7 +45,7 @@ Example config file
 Timeout
 ========
 
-A timeout can be specified in seconds. After this time, rsync will receive SIGINT.
+An *optional* timeout can be specified in seconds. After this time, rsync will receive SIGINT.
 
 Logs
 ======
