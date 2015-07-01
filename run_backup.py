@@ -129,10 +129,25 @@ def backup(context, logger):
         orig_handlers[sig_x] = signal.getsignal(sig_x)
         signal.signal(signal.SIGINT, sig_handler)
 
-    try:
-        process.wait(context.timeout_secs)
-    except subprocess.TimeoutExpired:
-        status = 'time expired'
+    if context.timeout_secs is None:
+        process.wait()
+    else:
+        # After this delay, we'll abort
+        logger.info(
+            "Setting up alarm clock: "
+            "we'll stop in %s seconds max",
+            context.timeout_secs
+        )
+        try:
+            process.wait(context.timeout_secs)
+        except subprocess.TimeoutExpired:
+            status = 'time expired'
+            logger.error(
+                'time expired, interrupting process %s with ^C',
+                process.pid
+            )
+            os.kill(process.pid, signal.SIGINT)
+            process.wait()
 
     for sig_x in handled_signals:
         # restore original signals
@@ -334,15 +349,6 @@ if __name__ == '__main__':
     context = context()
 
     logger = setup_log(context)
-
-    if context.timeout_secs is not None:
-        # After this delay, we'll abort
-        logger.info(
-            "Setting up alarm clock: "
-            "we'll stop in %s seconds max",
-            context.timeout_secs
-        )
-        signal.alarm(context.timeout_secs)
 
     try:
         status = backup(context, logger)

@@ -35,6 +35,7 @@ Example config file
         dst_dir=/mirror/of/dir
         logbase=/place/where/i/log
         mailto=user@example.com
+        timeout_secs=14000
 
         [mail]
         smtp=smtp.example.com
@@ -56,4 +57,3 @@ Plans
 * Simple packaging
 * Support command line options.
 * Support several backups at the same time.
-* Support time out (github issue #1 on this project)
