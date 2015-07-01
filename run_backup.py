@@ -53,6 +53,7 @@ Context = collections.namedtuple(
         'host',
         'src_dir',
         'dst_dir',
+        'timeout_secs',
         'logfile',
         'mail',
         'log_out_fd',
@@ -99,10 +100,15 @@ def backup(context, logger):
         stderr=context.log_err_fd,
     )
 
-    handled_signals = (signal.SIGINT, signal.SIGKILL, signal.SIGQUIT)
+    handled_signals = (
+        signal.SIGINT,
+        signal.SIGKILL,
+        signal.SIGQUIT,
+    )
 
     def sig_handler(signum, frame):
         logger = logging.getLogger('main.sig_handler-{0}'.format(signum))
+
         logger.info(
             "Got signal %s, propagating to process %s",
             signum, process.pid
@@ -115,6 +121,7 @@ def backup(context, logger):
             #
             # no further processing is done, only logging,
             # and we need that logging whenever possible
+
     orig_handlers = {}
 
     for sig_x in handled_signals:
@@ -122,7 +129,10 @@ def backup(context, logger):
         orig_handlers[sig_x] = signal.getsignal(sig_x)
         signal.signal(signal.SIGINT, sig_handler)
 
-    process.wait()
+    try:
+        process.wait(context.timeout_secs)
+    except subprocess.TimeoutExpired:
+        status = 'time expired'
 
     for sig_x in handled_signals:
         # restore original signals
@@ -132,14 +142,18 @@ def backup(context, logger):
 
     if returncode == 0:
         logfn = logger.info
+        status = "success"
     else:
         logfn = logger.critical
+        status = status or "failure"
 
     context.log_ret_fd.write('{0}\n'.format(process.returncode))
     logfn('{0[0]} exited with status {1}'.format(command, returncode))
 
     for descr in (context.log_out_fd, context.log_err_fd, context.log_ret_fd):
         descr.close()
+
+    return status
 
 
 def _config_file():
@@ -181,6 +195,12 @@ def context(section_name='main_backup'):
     src_dir = config[section_name]['src_dir']
     dst_dir = config[section_name]['dst_dir']
     logbase = config[section_name]['logbase']
+
+    timeout_secs = config[section_name].get('timeout_secs', '')
+    if timeout_secs:
+        timeout_secs = int(timeout_secs)
+    else:
+        timeout_secs = None
 
     mailto = config[section_name].get('mailto', '')
     if mailto:
@@ -237,6 +257,7 @@ def context(section_name='main_backup'):
         host,
         src_dir,
         dst_dir,
+        timeout_secs,
         os.path.join(
             logbase, nowdir, '{}.log'.format(
                 os.path.basename(sys.argv[0])
@@ -257,7 +278,7 @@ def setup_log(context):
     return logger
 
 
-def log2mail(context):
+def log2mail(context, status):
     logging.getLogger('main.log2mail').debug(
         "sending mail to %s", context.mail.mailto
     )
@@ -269,10 +290,8 @@ def log2mail(context):
 
     taskdesc = 'backup of {0.host}:{0.src_dir} on {0.dst_dir}'.format(context)
 
-    if returncode == '0':
-        subject = '[success] {}'.format(taskdesc)
-    else:
-        subject = '[failed] {}'.format(taskdesc)
+    subject = '[{}] {}'.format(status, taskdesc)
+
     msg = MIMEMultipart()
     msg['Subject'] = subject
     msg['From'] = context.mail.mailfrom
@@ -316,10 +335,20 @@ if __name__ == '__main__':
 
     logger = setup_log(context)
 
+    if context.timeout_secs is not None:
+        # After this delay, we'll abort
+        logger.info(
+            "Setting up alarm clock: "
+            "we'll stop in %s seconds max",
+            context.timeout_secs
+        )
+        signal.alarm(context.timeout_secs)
+
     try:
-        backup(context, logger)
+        status = backup(context, logger)
     except BaseException as err:
         logger.exception("An error or interruption occured")
+        status = "problem occured"
     finally:
         if context.mail:
-            log2mail(context)
+            log2mail(context, status)
