@@ -272,6 +272,7 @@ def setup_log(context):
 
 
 def log2mail(context):
+    logging.getLogger('main.log2mail').debug("sending mail to %s", context.mail.mailto)
 
     if os.path.exists(context.log_ret_fd.name):
         returncode = open(context.log_ret_fd.name).read().strip()
