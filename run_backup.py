@@ -20,6 +20,12 @@ host=192.168.12.26
 src_dir=/dir/to/sync/
 dst_dir=/mirror/of/dir
 logbase=/place/where/i/log
+mailto=user@example.com
+
+[mail]
+smtp=smtp.example.com
+mailfrom=robots@example.com
+
 """
 
 
