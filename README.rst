@@ -19,7 +19,7 @@ The config file is mandatory.
 Places for config file
 -----------------------
 
-File must be named run_backup.rc an can exist in any xdg config dirs,
+File must be named run_backup.rc and can exist in any xdg config dirs,
 or in the user's home.
 
 If not found, the exe will tell you where it looked for it.
@@ -27,16 +27,18 @@ If not found, the exe will tell you where it looked for it.
 Example config file
 -----------------------
 
-[main_backup]
-host=192.168.12.26
-src_dir=/dir/to/sync/
-dst_dir=/mirror/of/dir
-logbase=/place/where/i/log
-mailto=user@example.com
+.. code-block:: ini
 
-[mail]
-smtp=smtp.example.com
-mailfrom=robots@example.com
+        [main_backup]
+        host=192.168.12.26
+        src_dir=/dir/to/sync/
+        dst_dir=/mirror/of/dir
+        logbase=/place/where/i/log
+        mailto=user@example.com
+
+        [mail]
+        smtp=smtp.example.com
+        mailfrom=robots@example.com
 
 Logs
 ======
