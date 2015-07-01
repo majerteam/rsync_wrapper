@@ -304,6 +304,7 @@ def log2mail(context):
     for name, fname in (
             ('stdout.txt', context.log_out_fd.name),
             ('stderr.txt', context.log_err_fd.name),
+            ('python.txt', context.logfile),
             ):
         textfile = MIMEApplication(
             open(fname, 'rb').read(),
