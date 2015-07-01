@@ -1,32 +1,18 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # coding: utf-8
 
 """
 Run rsync backup and log all data.
 
-Config file mandatory.
+Python >= 3.3
 
-Places for config file
------------------------
-
-File must be named run_backup.rc an can exist in any xdg config dirs,
-or in the user's home
-
-Example config file
------------------------
-
-[main_backup]
-host=192.168.12.26
-src_dir=/dir/to/sync/
-dst_dir=/mirror/of/dir
-logbase=/place/where/i/log
-mailto=user@example.com
-
-[mail]
-smtp=smtp.example.com
-mailfrom=robots@example.com
-
+See README.rst
 """
+
+
+__author__ = 'Feth Arezki'
+__licence__ = 'MIT'
+__version__ = "1.0.0"
 
 
 import collections
@@ -272,7 +258,9 @@ def setup_log(context):
 
 
 def log2mail(context):
-    logging.getLogger('main.log2mail').debug("sending mail to %s", context.mail.mailto)
+    logging.getLogger('main.log2mail').debug(
+        "sending mail to %s", context.mail.mailto
+    )
 
     if os.path.exists(context.log_ret_fd.name):
         returncode = open(context.log_ret_fd.name).read().strip()
