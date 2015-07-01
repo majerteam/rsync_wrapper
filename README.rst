@@ -41,15 +41,37 @@ Example config file
         smtp=smtp.example.com
         mailfrom=robots@example.com
 
+
+Timeout
+========
+
+A timeout can be specified in seconds. After this time, rsync will receive SIGINT.
+
 Logs
 ======
 
 Logs are stored in the directory you specify, under a directory hierarchy of YYYY/MM/DD/hh_mm_ss.microseconds
 
+Mails
+=======
+
 Sending mail or not
-====================
+----------------------
 
 If there is no mailto in 'main_backup', no mail will be sent.
+
+Mail subject
+-------------
+
+the title of the mail looks like::
+
+    [time expired] backup of 192.168.12.26:/dir/to/sync/ on /mirror/of/dir/
+
+Possible statuses:
+
+* success
+* failure (non 0 code for rsync)
+* time expired
 
 Plans
 ======
