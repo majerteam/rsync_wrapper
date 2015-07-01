@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# coding: utf-8
 
 """
 Run rsync backup and log all data.
@@ -27,10 +28,12 @@ import configparser
 import datetime
 import logging
 import os
+import signal
 import smtplib
 import subprocess
 import sys
 
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -103,7 +106,36 @@ def backup(context, logger):
         stdout=context.log_out_fd,
         stderr=context.log_err_fd,
     )
+
+    handled_signals = (signal.SIGINT, signal.SIGKILL, signal.SIGQUIT)
+
+    def sig_handler(signum, frame):
+        logger = logging.getLogger('main.sig_handler-{0}'.format(signum))
+        logger.info(
+            "Got signal %s, propagating to process %s",
+            signum, process.pid
+        )
+        try:
+            os.kill(process.pid, signum)
+        except BaseException:
+            logger.exception("Error while killing process : %s", process.pid)
+            # not propagating error:
+            #
+            # no further processing is done, only logging,
+            # and we need that logging whenever possible
+    orig_handlers = {}
+
+    for sig_x in handled_signals:
+        # install own signals
+        orig_handlers[sig_x] = signal.getsignal(sig_x)
+        signal.signal(signal.SIGINT, sig_handler)
+
     process.wait()
+
+    for sig_x in handled_signals:
+        # restore original signals
+        signal.signal(signal.SIGINT, orig_handlers[sig_x])
+
     returncode = process.returncode
 
     if returncode == 0:
@@ -220,7 +252,6 @@ def context(section_name='main_backup'):
         ),
         mailcfg,
         ) + tuple(log_fds)
-    print(ctx_args)
     return Context(*ctx_args)
 
 
@@ -258,7 +289,9 @@ def log2mail(context):
         '{}\nreturncode of rsync was {}\n'.format(
             subject,
             returncode
-        )
+        ).encode('utf-8'),
+        'plain',
+        'utf-8'
     )
     msg.attach(readable)
 
@@ -266,10 +299,9 @@ def log2mail(context):
             ('stdout.txt', context.log_out_fd.name),
             ('stderr.txt', context.log_err_fd.name),
             ):
-        textfile = MIMEText(
-            open(fname, 'rt', encoding='utf-8').read(),
-            'plain',
-            'utf-8'
+        textfile = MIMEApplication(
+            open(fname, 'rb').read(),
+            'application/text',
         )
         textfile.add_header('Content-Disposition', 'attachment', filename=name)
         msg.attach(textfile)
