@@ -123,6 +123,7 @@ def backup(context, logger):
             # and we need that logging whenever possible
 
     orig_handlers = {}
+    status = ''
 
     for sig_x in handled_signals:
         # install own signals
