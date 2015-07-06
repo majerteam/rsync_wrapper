@@ -28,6 +28,7 @@ import sys
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import make_msgid
 
 
 class BackupException(Exception):
@@ -50,6 +51,7 @@ if not StreamHandler:
 Context = collections.namedtuple(
     'BackupContext',
     (
+        'ourname',
         'host',
         'src_dir',
         'dst_dir',
@@ -69,6 +71,8 @@ MailConfig = collections.namedtuple(
         'mailto',
         'mailfrom',
         'smtp',
+        'thread_ids',
+        'taskdesc',
     )
 )
 
@@ -105,6 +109,9 @@ def backup(context, logger):
         signal.SIGKILL,
         signal.SIGQUIT,
     )
+
+    if context.mail:
+        startupmail(context, process.pid)
 
     def sig_handler(signum, frame):
         logger = logging.getLogger('main.sig_handler-{0}'.format(signum))
@@ -199,6 +206,7 @@ def _config_file():
 def context(section_name='main_backup'):
     """Read data, clean it up a bit
     """
+    ourname = os.path.basename(sys.argv[0])
 
     config = configparser.ConfigParser()
     config_fname = _config_file()
@@ -240,7 +248,9 @@ def context(section_name='main_backup'):
         mailcfg = MailConfig(
             mailto,
             mailfrom,
-            config['mail'].get('smtp', 'smtp')
+            config['mail'].get('smtp', 'smtp'),
+            [],
+            'backup of {}:{} on {}'.format(host, src_dir, dst_dir),
         )
     else:
         mailcfg = None
@@ -270,14 +280,13 @@ def context(section_name='main_backup'):
     )
 
     ctx_args = (
+        ourname,
         host,
         src_dir,
         dst_dir,
         timeout_secs,
         os.path.join(
-            logbase, nowdir, '{}.log'.format(
-                os.path.basename(sys.argv[0])
-            )
+            logbase, nowdir, '{}.log'.format(ourname)
         ),
         mailcfg,
         ) + tuple(log_fds)
@@ -294,30 +303,49 @@ def setup_log(context):
     return logger
 
 
-def log2mail(context, status):
+def _makemail(context, status):
     logging.getLogger('main.log2mail').debug(
         "sending mail to %s", context.mail.mailto
     )
+
+    msg = MIMEMultipart()
+    msg['Subject'] = '[{}] {}'.format(status, context.mail.taskdesc)
+    msg['From'] = context.mail.mailfrom
+    msg['To'] = context.mail.mailto
+
+    # thread mails
+    msgid = make_msgid(context.ourname)
+    msg["Message-ID"] = msgid
+    if context.mail.thread_ids:
+        msg["In-Reply-To"] = context.mail.thread_ids[-1]
+    context.mail.thread_ids.append(msgid)
+
+    msg.preamble = 'mail sent by run_backup'
+
+    return msg
+
+
+def _sendmail(mailcontext, msg):
+    session = smtplib.SMTP(mailcontext.smtp)
+    session.sendmail(
+        mailcontext.mailfrom,
+        [mailcontext.mailto],
+        msg.as_string()
+    )
+    session.quit()
+
+
+def log2mail(context, status):
+    msg = _makemail(context, status)
 
     if os.path.exists(context.log_ret_fd.name):
         returncode = open(context.log_ret_fd.name).read().strip()
     else:
         returncode = "unknown"
 
-    taskdesc = 'backup of {0.host}:{0.src_dir} on {0.dst_dir}'.format(context)
-
-    subject = '[{}] {}'.format(status, taskdesc)
-
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From'] = context.mail.mailfrom
-    msg['To'] = context.mail.mailto
-
-    msg.preamble = 'mail sent by run_backup'
-
     readable = MIMEText(
         '{}\nreturncode of rsync was {}\n'.format(
-            subject,
+            context.mail.taskdesc,
             returncode
         ).encode('utf-8'),
         'plain',
@@ -337,13 +365,21 @@ def log2mail(context, status):
         textfile.add_header('Content-Disposition', 'attachment', filename=name)
         msg.attach(textfile)
 
-    session = smtplib.SMTP(context.mail.smtp)
-    session.sendmail(
-        context.mail.mailfrom,
-        [context.mail.mailto],
-        msg.as_string()
+    _sendmail(context.mail, msg)
+
+
+def startupmail(context, rsync_pid):
+    msg = _makemail(context, 'starting')
+    readable = MIMEText(
+        'rsync started with pid {}\nPlease do not delete this mail '
+        'before operation is complete'.format(
+            rsync_pid
+        ).encode('utf-8'),
+        'plain',
+        'utf-8'
     )
-    session.quit()
+    msg.attach(readable)
+    _sendmail(context.mail, msg)
 
 
 if __name__ == '__main__':
