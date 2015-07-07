@@ -114,11 +114,14 @@ def intercept_signals(sig_handler):
 def _wait_with_timeout(process):
     status = '' # unset
 
+    now = datetime.datetime.now()
+    stoptime = now + datetime.timedelta(seconds=context.timeout_secs)
     # After this delay, we'll abort
     logger.info(
         "Setting up alarm clock: "
-        "we'll stop in %s seconds max",
-        context.timeout_secs
+        "we'll stop in %s seconds max - at %s",
+        context.timeout_secs,
+        stoptime.isoformat()
     )
     try:
         process.wait(context.timeout_secs)
@@ -324,7 +327,11 @@ def context(section_name='main_backup'):
 def setup_log(context):
     """Setup the logs for this script
     """
-    logging.basicConfig(filename=context.logfile, level=logging.DEBUG)
+    logging.basicConfig(
+        filename=context.logfile,
+        level=logging.DEBUG,
+        format="%(date)s [%(name)s:%(levelname)s]: %(message)s"
+    )
     logger = logging.getLogger('main')
     # log to stdout
     logger.addHandler(StreamHandler(sys.stdout))
