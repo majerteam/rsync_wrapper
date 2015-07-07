@@ -24,12 +24,22 @@ import signal
 import smtplib
 import subprocess
 import sys
+from contextlib import contextmanager
 
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import make_msgid
 
+
+
+PROPAGATED_SIGNALS = (
+    signal.SIGINT,
+    signal.SIGHUP,
+#    signal.SIGKILL, cannot handle -> runaway rsync
+    signal.SIGQUIT,
+    signal.SIGTERM,
+)
 
 class BackupException(Exception):
     pass
@@ -77,6 +87,54 @@ MailConfig = collections.namedtuple(
 )
 
 
+@contextmanager
+def intercept_signals(sig_handler):
+    """Setup/restore interception of kill signals
+
+    this is a context manager"""
+
+    logger = logging.getLogger('main.signal_handling')
+
+    orig_handlers = {}
+
+    for sig_x in PROPAGATED_SIGNALS:
+        # install own signals
+        orig_handlers[sig_x] = signal.getsignal(sig_x)
+        logger.debug('setting up handler for signal %s', sig_x)
+
+        signal.signal(sig_x, sig_handler)
+
+    yield
+
+    for sig_x in PROPAGATED_SIGNALS:
+        # restore original signals
+        signal.signal(sig_x, orig_handlers[sig_x])
+
+
+def _wait_with_timeout(process):
+    status = '' # unset
+
+    # After this delay, we'll abort
+    logger.info(
+        "Setting up alarm clock: "
+        "we'll stop in %s seconds max",
+        context.timeout_secs
+    )
+    try:
+        process.wait(context.timeout_secs)
+    except subprocess.TimeoutExpired:
+        status = 'time expired'
+        logger.error(
+            'time expired, interrupting process %s with ^C',
+            process.pid
+        )
+        # Kill properly with sigint
+        os.kill(process.pid, signal.SIGINT)
+        process.wait()
+
+    return status
+
+
 def backup(context, logger):
     """
     Actually run rsync
@@ -104,12 +162,6 @@ def backup(context, logger):
         stderr=context.log_err_fd,
     )
 
-    handled_signals = (
-        signal.SIGINT,
-        signal.SIGKILL,
-        signal.SIGQUIT,
-    )
-
     if context.mail:
         startupmail(context, process.pid)
 
@@ -129,37 +181,13 @@ def backup(context, logger):
             # no further processing is done, only logging,
             # and we need that logging whenever possible
 
-    orig_handlers = {}
     status = ''
 
-    for sig_x in handled_signals:
-        # install own signals
-        orig_handlers[sig_x] = signal.getsignal(sig_x)
-        signal.signal(signal.SIGINT, sig_handler)
-
-    if context.timeout_secs is None:
-        process.wait()
-    else:
-        # After this delay, we'll abort
-        logger.info(
-            "Setting up alarm clock: "
-            "we'll stop in %s seconds max",
-            context.timeout_secs
-        )
-        try:
-            process.wait(context.timeout_secs)
-        except subprocess.TimeoutExpired:
-            status = 'time expired'
-            logger.error(
-                'time expired, interrupting process %s with ^C',
-                process.pid
-            )
-            os.kill(process.pid, signal.SIGINT)
+    with intercept_signals(sig_handler):
+        if context.timeout_secs is None:
             process.wait()
-
-    for sig_x in handled_signals:
-        # restore original signals
-        signal.signal(signal.SIGINT, orig_handlers[sig_x])
+        else:
+            status = _wait_with_timeout(process)
 
     returncode = process.returncode
 
